@@ -12,6 +12,7 @@ export interface UserProfile {
   email: string;
   photoURL?: string;
   regionCode: string;
+  state?: string;
   createdAt: any;
 }
 
