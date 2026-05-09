@@ -29,6 +29,7 @@ export default function Dashboard() {
   const { user } = useAuth();
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     if (!user) return;
@@ -36,6 +37,7 @@ export default function Dashboard() {
   }, [user]);
 
   async function loadStats() {
+    try {
     const listsRef = collection(db, "lists");
     const q = query(
       listsRef,
@@ -95,6 +97,9 @@ export default function Dashboard() {
       monthlyData,
       qtyHistogram: Object.entries(qtyHistogram).map(([k, v]) => ({ name: k, value: v })),
     });
+    } catch (err: any) {
+      setError(err.message || "Erro ao carregar dados");
+    }
     setLoading(false);
   }
 
@@ -102,6 +107,18 @@ export default function Dashboard() {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="animate-spin rounded-full h-10 w-10 border-4 border-primary-500 border-t-transparent" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="card text-center py-12">
+        <div className="text-red-500 text-lg font-semibold mb-2">Erro ao carregar</div>
+        <p className="text-gray-500 text-sm mb-4">{error}</p>
+        <button onClick={() => { setError(""); setLoading(true); loadStats(); }} className="btn-primary">
+          Tentar novamente
+        </button>
       </div>
     );
   }

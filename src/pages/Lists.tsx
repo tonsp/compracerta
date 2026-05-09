@@ -35,6 +35,7 @@ export default function Lists() {
   const navigate = useNavigate();
   const [lists, setLists] = useState<Lista[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
   const [showCreate, setShowCreate] = useState(false);
   const [newTitle, setNewTitle] = useState("");
   const [shareEmail, setShareEmail] = useState("");
@@ -73,6 +74,9 @@ export default function Lists() {
       );
 
       setLists(enriched);
+      setLoading(false);
+    }, (err) => {
+      setError(err.message || "Erro ao carregar listas");
       setLoading(false);
     });
 
@@ -156,6 +160,18 @@ export default function Lists() {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="animate-spin rounded-full h-10 w-10 border-4 border-primary-500 border-t-transparent" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="card text-center py-12">
+        <div className="text-red-500 text-lg font-semibold mb-2">Erro ao carregar</div>
+        <p className="text-gray-500 text-sm mb-4">{error}</p>
+        <button onClick={() => window.location.reload()} className="btn-primary">
+          Tentar novamente
+        </button>
       </div>
     );
   }
