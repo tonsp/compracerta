@@ -18,6 +18,7 @@ import {
 import { formatCurrency } from "../lib/utils";
 import {
   getEstimatedPrice,
+  loadPrices,
   getAllCategories,
   getAllProductsByCategory,
   saveUserPrice,
@@ -64,8 +65,8 @@ export default function ListDetail() {
   const [newUnit, setNewUnit] = useState("un");
   const [newSection, setNewSection] = useState("");
   const [newCustomPrice, setNewCustomPrice] = useState("");
-  const [categories] = useState(() => getAllCategories());
-  const [productsByCategory] = useState(() => getAllProductsByCategory());
+  const [categories, setCategories] = useState<string[]>([]);
+  const [productsByCategory, setProductsByCategory] = useState<Record<string, string[]>>({});
   const [expandedCat, setExpandedCat] = useState<string | null>(null);
   const [showCustomInput, setShowCustomInput] = useState(false);
 
@@ -94,6 +95,19 @@ export default function ListDetail() {
 
   // Collapsed sections
   const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({});
+
+  // Load product catalog when opening add mode
+  useEffect(() => {
+    if (addMode) {
+      loadPricesData();
+    }
+  }, [addMode]);
+
+  async function loadPricesData() {
+    await loadPrices();
+    setCategories(getAllCategories());
+    setProductsByCategory(getAllProductsByCategory());
+  }
 
   useEffect(() => {
     if (!listId || !user) return;
