@@ -4,16 +4,51 @@ import { updateUserProfile } from "../lib/firestore";
 import { LogOut, User, Mail, MapPin } from "lucide-react";
 import { logout } from "../lib/auth";
 
-const ESTADOS = [
-  "AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA",
-  "MT", "MS", "MG", "PA", "PB", "PR", "PE", "PI", "RJ", "RN",
-  "RS", "RO", "RR", "SC", "SP", "SE", "TO"
-];
+const ESTADOS: Record<string, string> = {
+  "AC": "Acre", "AL": "Alagoas", "AP": "Amapá", "AM": "Amazonas",
+  "BA": "Bahia", "CE": "Ceará", "DF": "Distrito Federal", "ES": "Espírito Santo",
+  "GO": "Goiás", "MA": "Maranhão", "MT": "Mato Grosso", "MS": "Mato Grosso do Sul",
+  "MG": "Minas Gerais", "PA": "Pará", "PB": "Paraíba", "PR": "Paraná",
+  "PE": "Pernambuco", "PI": "Piauí", "RJ": "Rio de Janeiro", "RN": "Rio Grande do Norte",
+  "RS": "Rio Grande do Sul", "RO": "Rondônia", "RR": "Roraima", "SC": "Santa Catarina",
+  "SP": "São Paulo", "SE": "Sergipe", "TO": "Tocantins"
+};
+
+const CIDADES: Record<string, string[]> = {
+  "SP": ["Sao Paulo", "Campinas", "Guarulhos", "Sao Bernardo do Campo", "Santo Andre", "Osasco", "Sorocaba", "Ribeirao Preto", "Santos", "Sao Jose dos Campos"],
+  "RJ": ["Rio de Janeiro", "Niteroi", "Sao Goncalo", "Duque de Caxias", "Nova Iguacu", "Belford Roxo", "Campos dos Goytacazes", "Petropolis"],
+  "MG": ["Belo Horizonte", "Uberlandia", "Contagem", "Juiz de Fora", "Betim", "Montes Claros", "Uberaba", "Governador Valadares"],
+  "BA": ["Salvador", "Feira de Santana", "Vitoria da Conquista", "Camacari", "Itabuna", "Juazeiro", "Lauro de Freitas"],
+  "CE": ["Fortaleza", "Caucaia", "Juazeiro do Norte", "Maracanau", "Sobral"],
+  "PE": ["Recife", "Jaboatao dos Guararapes", "Olinda", "Caruaru", "Paulista", "Petrolina"],
+  "RS": ["Porto Alegre", "Caxias do Sul", "Canoas", "Pelotas", "Santa Maria", "Gravatai", "Novo Hamburgo"],
+  "PR": ["Curitiba", "Londrina", "Maringa", "Ponta Grossa", "Cascavel", "Sao Jose dos Pinhais", "Foz do Iguacu"],
+  "DF": ["Brasilia"],
+  "GO": ["Goiania", "Aparecida de Goiania", "Anapolis", "Rio Verde", "Luziania"],
+  "AM": ["Manaus", "Parintins", "Itacoatiara"],
+  "PA": ["Belem", "Ananindeua", "Santarem", "Maraba"],
+  "MA": ["Sao Luis", "Imperatriz", "Sao Jose de Ribamar", "Timon"],
+  "PB": ["Joao Pessoa", "Campina Grande", "Santa Rita"],
+  "RN": ["Natal", "Mossoro", "Parnamirim"],
+  "MT": ["Cuiaba", "Varzea Grande", "Rondonopolis", "Sinop"],
+  "MS": ["Campo Grande", "Dourados", "Tres Lagoas", "Corumba"],
+  "PI": ["Teresina", "Parnaiba"],
+  "SE": ["Aracaju", "Nossa Senhora do Socorro"],
+  "SC": ["Florianopolis", "Joinville", "Blumenau", "Sao Jose", "Chapeco", "Itajai", "Criciuma"],
+  "AL": ["Maceio", "Arapiraca", "Rio Largo"],
+  "ES": ["Vitoria", "Vila Velha", "Serra", "Cariacica", "Cachoeiro de Itapemirim"],
+  "RO": ["Porto Velho", "Ji-Parana"],
+  "TO": ["Palmas", "Araguaina", "Gurupi"],
+  "AC": ["Rio Branco"],
+  "AP": ["Macapa"],
+  "RR": ["Boa Vista"],
+};
 
 export default function Profile() {
   const { user, profile, refreshProfile } = useAuth();
   const [name, setName] = useState(profile?.name || "");
   const [state, setState] = useState(profile?.state || "SP");
+  const [city, setCity] = useState(profile?.city || "");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
@@ -21,7 +56,7 @@ export default function Profile() {
     e.preventDefault();
     if (!user) return;
     setSaving(true);
-    await updateUserProfile(user.uid, { name, state, regionCode: state });
+    await updateUserProfile(user.uid, { name, state, city, regionCode: state });
     await refreshProfile();
     setSaving(false);
     setSaved(true);
@@ -59,22 +94,43 @@ export default function Profile() {
             </div>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium mb-1.5 text-gray-700 dark:text-gray-300">
-              Estado (referência de preços)
-            </label>
-            <div className="relative">
-              <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-              <select value={state} onChange={(e) => setState(e.target.value)} className="input-field pl-10">
-                {ESTADOS.map((uf) => (
-                  <option key={uf} value={uf}>{uf}</option>
-                ))}
-              </select>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-medium mb-1.5 text-gray-700 dark:text-gray-300">Estado</label>
+              <div className="relative">
+                <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <select
+                  value={state}
+                  onChange={(e) => { setState(e.target.value); setCity(""); }}
+                  className="input-field pl-10"
+                >
+                  {Object.entries(ESTADOS).map(([uf, nome]) => (
+                    <option key={uf} value={uf}>{uf} - {nome}</option>
+                  ))}
+                </select>
+              </div>
             </div>
-            <p className="text-xs text-gray-400 mt-1">
-              Os preços estimados serão baseados no seu estado. Você pode editar preços individuais na lista.
-            </p>
+            <div>
+              <label className="block text-sm font-medium mb-1.5 text-gray-700 dark:text-gray-300">Cidade</label>
+              <div className="relative">
+                <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <select
+                  value={city}
+                  onChange={(e) => setCity(e.target.value)}
+                  className="input-field pl-10"
+                >
+                  <option value="">Todo o estado</option>
+                  {(CIDADES[state] || []).map((c) => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
           </div>
+
+          <p className="text-xs text-gray-400">
+            Os preços estimados serão baseados na sua cidade/estado. Você pode editar preços individuais ao adicionar itens.
+          </p>
 
           <button type="submit" disabled={saving} className="btn-primary w-full">
             {saving ? "Salvando..." : saved ? "Salvo!" : "Salvar alterações"}

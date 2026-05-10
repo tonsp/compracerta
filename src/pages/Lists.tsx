@@ -16,7 +16,7 @@ import {
   onSnapshot,
 } from "firebase/firestore";
 import { formatDate, formatCurrency } from "../lib/utils";
-import { Plus, Trash2, Users, ArrowRight, Sparkles } from "lucide-react";
+import { Plus, Trash2, Users, ArrowRight, Sparkles, Copy, X } from "lucide-react";
 import { getEstimatedPrice } from "../lib/priceService";
 
 interface Lista {
@@ -42,6 +42,9 @@ export default function Lists() {
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [showCloneHistory, setShowCloneHistory] = useState(false);
+  const [historyLists, setHistoryLists] = useState<{ id: string; title: string; date: string; items: number }[]>([]);
+  const [cloningId, setCloningId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -156,6 +159,57 @@ export default function Lists() {
     setDeletingId(null);
   }
 
+  async function loadHistoryLists() {
+    const q = query(
+      collection(db, "lists"),
+      where("participants", "array-contains", user!.uid),
+      where("status", "==", "completed"),
+      orderBy("createdAt", "desc")
+    );
+    const snap = await getDocs(q);
+    const data = await Promise.all(
+      snap.docs.map(async (d) => {
+        const itemsSnap = await getDocs(collection(db, "lists", d.id, "items"));
+        const dObj = d.data();
+        const dateStr = dObj.createdAt?.toDate?.()?.toLocaleDateString?.("pt-BR") || "";
+        return { id: d.id, title: dObj.title, date: dateStr, items: itemsSnap.size };
+      })
+    );
+    setHistoryLists(data);
+    setShowCloneHistory(true);
+  }
+
+  async function handleClone(listId: string) {
+    if (!newTitle.trim()) return;
+    setCloningId(listId);
+    const itemsSnap = await getDocs(collection(db, "lists", listId, "items"));
+    const newDoc = await addDoc(collection(db, "lists"), {
+      title: newTitle.trim(),
+      createdBy: user!.uid,
+      createdAt: serverTimestamp(),
+      lastUpdated: serverTimestamp(),
+      status: "active",
+      participants: [user!.uid],
+    });
+    for (const itemDoc of itemsSnap.docs) {
+      const item = itemDoc.data();
+      await addDoc(collection(db, "lists", newDoc.id, "items"), {
+        name: item.name || "",
+        plannedQty: item.plannedQty || 0,
+        unit: item.unit || "un",
+        estimatedPrice: item.estimatedPrice || 0,
+        checked: false,
+        section: item.section || "",
+        createdAt: serverTimestamp(),
+      });
+    }
+    setNewTitle("");
+    setShowCreate(false);
+    setShowCloneHistory(false);
+    setCloningId(null);
+    navigate(`/lists/${newDoc.id}`);
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -200,7 +254,7 @@ export default function Lists() {
       {/* Create modal */}
       {showCreate && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="card w-full max-w-md">
+          <div className="card w-full max-w-md max-h-[90vh] overflow-y-auto">
             <h2 className="text-xl font-semibold mb-4">Nova Lista</h2>
 
             <div className="space-y-4">
@@ -241,6 +295,48 @@ export default function Lists() {
                 </div>
               )}
 
+              {/* Clone from history */}
+              {!showCloneHistory ? (
+                <button
+                  onClick={() => loadHistoryLists()}
+                  className="w-full py-2.5 border border-dashed border-gray-300 dark:border-gray-700 rounded-xl text-sm text-gray-500 dark:text-gray-400 hover:border-primary-500 hover:text-primary-500 transition-colors flex items-center justify-center gap-2"
+                >
+                  <Copy className="w-4 h-4" />
+                  Copiar do histórico
+                </button>
+              ) : (
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                      Selecione uma lista para copiar:
+                    </span>
+                    <button onClick={() => setShowCloneHistory(false)} className="text-gray-400 hover:text-gray-600">
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                  <div className="max-h-40 overflow-y-auto space-y-1">
+                    {historyLists.length === 0 ? (
+                      <p className="text-sm text-gray-400 text-center py-4">Nenhuma lista no histórico.</p>
+                    ) : (
+                      historyLists.map((hl) => (
+                        <button
+                          key={hl.id}
+                          onClick={() => handleClone(hl.id)}
+                          disabled={cloningId === hl.id || !newTitle.trim()}
+                          className="w-full text-left px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors disabled:opacity-50"
+                        >
+                          <div className="flex justify-between items-center">
+                            <span className="text-sm font-medium">{hl.title}</span>
+                            <span className="text-xs text-gray-400">{hl.items} itens</span>
+                          </div>
+                          <span className="text-xs text-gray-400">{hl.date}</span>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
+
               <div className="flex gap-2 pt-2">
                 <button
                   onClick={handleCreate}
@@ -250,7 +346,7 @@ export default function Lists() {
                   {busy ? "Criando..." : "Criar"}
                 </button>
                 <button
-                  onClick={() => setShowCreate(false)}
+                  onClick={() => { setShowCreate(false); setShowCloneHistory(false); }}
                   className="btn-secondary"
                 >
                   Cancelar

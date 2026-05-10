@@ -4,6 +4,7 @@ import { db } from "./firebase";
 export interface PriceTable {
   categorias: Record<string, string[]>;
   precos: Record<string, Record<string, number>>;
+  cidades?: Record<string, Record<string, number>>;
 }
 
 let priceCache: PriceTable | null = null;
@@ -32,15 +33,6 @@ export function getAllProductsByCategory(): Record<string, string[]> {
   return { ...priceCache.categorias };
 }
 
-export function getAllProductNames(): string[] {
-  if (!priceCache) return [];
-  const names: string[] = [];
-  for (const prods of Object.values(priceCache.categorias)) {
-    names.push(...prods);
-  }
-  return names;
-}
-
 export function normalizeProductName(name: string): string {
   return name
     .toLowerCase()
@@ -56,7 +48,6 @@ export async function getUserPriceOverrides(
 ): Promise<Record<string, number>> {
   const cacheKey = `${userId}_${regionCode}`;
   if (userPriceCache[cacheKey]) return userPriceCache[cacheKey];
-
   try {
     const snap = await getDoc(doc(db, "userPrices", `${userId}_${regionCode}`));
     if (snap.exists()) {
@@ -84,44 +75,59 @@ export async function saveUserPrice(
   );
 }
 
-export async function getEstimatedPrice(
-  productName: string,
-  regionCode: string = "padrao",
-  userId?: string
-): Promise<number> {
-  await loadPrices();
-
-  const normalized = normalizeProductName(productName);
-
-  if (userId) {
-    const overrides = await getUserPriceOverrides(userId, regionCode);
-    const overrideKey = Object.keys(overrides).find(
-      (k) => normalizeProductName(k) === normalized
-    );
-    if (overrideKey) return overrides[overrideKey];
-  }
-
-  const regionPrices = priceCache!.precos[regionCode] || priceCache!.precos["padrao"];
-  if (!regionPrices) return 0;
-
-  const match = Object.keys(regionPrices).find(
+function findPriceInTable(
+  table: Record<string, number>,
+  normalized: string
+): number | null {
+  const match = Object.keys(table).find(
     (k) =>
       normalizeProductName(k) === normalized ||
       normalizeProductName(k).includes(normalized) ||
       normalized.includes(normalizeProductName(k))
   );
+  return match ? table[match] : null;
+}
 
-  if (match) return regionPrices[match];
+export async function getEstimatedPrice(
+  productName: string,
+  regionCode: string = "padrao",
+  userId?: string,
+  city?: string
+): Promise<number> {
+  await loadPrices();
+  const normalized = normalizeProductName(productName);
 
-  const padraoPrices = regionCode !== "padrao" ? priceCache!.precos["padrao"] : null;
-  if (padraoPrices) {
-    const fallback = Object.keys(padraoPrices).find(
-      (k) =>
-        normalizeProductName(k) === normalized ||
-        normalizeProductName(k).includes(normalized) ||
-        normalized.includes(normalizeProductName(k))
+  // 1. User override
+  if (userId) {
+    const overrideKey = city || regionCode;
+    const overrides = await getUserPriceOverrides(userId, overrideKey);
+    const match = Object.keys(overrides).find(
+      (k) => normalizeProductName(k) === normalized
     );
-    if (fallback) return padraoPrices[fallback];
+    if (match) return overrides[match];
+  }
+
+  // 2. City prices
+  if (city && priceCache!.cidades) {
+    const cityPrices = priceCache!.cidades[city];
+    if (cityPrices) {
+      const found = findPriceInTable(cityPrices, normalized);
+      if (found !== null) return found;
+    }
+  }
+
+  // 3. State prices
+  const statePrices = priceCache!.precos[regionCode];
+  if (statePrices) {
+    const found = findPriceInTable(statePrices, normalized);
+    if (found !== null) return found;
+  }
+
+  // 4. Default
+  const padraoPrices = priceCache!.precos["padrao"];
+  if (padraoPrices) {
+    const found = findPriceInTable(padraoPrices, normalized);
+    if (found !== null) return found;
   }
 
   return 0;

@@ -13,6 +13,7 @@ export interface UserProfile {
   photoURL?: string;
   regionCode: string;
   state?: string;
+  city?: string;
   createdAt: any;
 }
 

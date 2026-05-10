@@ -61,7 +61,7 @@ export default function ListDetail() {
   // Add item — categorized picker
   const [addMode, setAddMode] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [newQty, setNewQty] = useState(1);
+  const [newQty, setNewQty] = useState("1");
   const [newUnit, setNewUnit] = useState("un");
   const [newSection, setNewSection] = useState("");
   const [newCustomPrice, setNewCustomPrice] = useState("");
@@ -73,10 +73,10 @@ export default function ListDetail() {
   // Edit item
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
-  const [editQty, setEditQty] = useState(0);
+  const [editQty, setEditQty] = useState("");
   const [editUnit, setEditUnit] = useState("un");
   const [editSection, setEditSection] = useState("");
-  const [editEstimatedPrice, setEditEstimatedPrice] = useState(0);
+  const [editEstimatedPrice, setEditEstimatedPrice] = useState("");
 
   // Checkout modal
   const [checkoutItem, setCheckoutItem] = useState<Item | null>(null);
@@ -178,12 +178,13 @@ export default function ListDetail() {
 
   async function handleSelectProduct(productName: string) {
     if (!listId) return;
-    const region = profile?.regionCode || profile?.state || "padrao";
-    let price = await getEstimatedPrice(productName, region, user?.uid);
+    const region = profile?.state || profile?.regionCode || "padrao";
+    let price = await getEstimatedPrice(productName, region, user?.uid, profile?.city);
     if (newCustomPrice) price = parseFloat(newCustomPrice) || price;
+    const qty = parseFloat(newQty) || 1;
     await addDoc(collection(db, "lists", listId, "items"), {
       name: productName,
-      plannedQty: newQty,
+      plannedQty: qty,
       unit: newUnit,
       estimatedPrice: price,
       checked: false,
@@ -198,14 +199,14 @@ export default function ListDetail() {
   }
 
   async function handleAddCustom() {
-    if (!newCustomPrice.trim() && !searchQuery.trim()) return;
-    const name = searchQuery.trim() || "Novo item";
+    const name = searchQuery.trim();
+    if (!name) return;
     await handleSelectProduct(name);
   }
 
   function resetAddForm() {
     setSearchQuery("");
-    setNewQty(1);
+    setNewQty("1");
     setNewUnit("un");
     setNewSection("");
     setNewCustomPrice("");
@@ -217,19 +218,20 @@ export default function ListDetail() {
   async function handleEditItem(item: Item) {
     setEditingId(item.id);
     setEditName(item.name);
-    setEditQty(item.plannedQty);
+    setEditQty((item.plannedQty || 0).toString());
     setEditUnit(item.unit);
     setEditSection(item.section || "");
-    setEditEstimatedPrice(item.estimatedPrice || 0);
+    setEditEstimatedPrice((item.estimatedPrice || 0).toString());
   }
 
   async function handleSaveEdit() {
     if (!editingId || !listId) return;
+    if (!editName.trim()) return;
     await updateDoc(doc(db, "lists", listId, "items", editingId), {
       name: editName.trim(),
-      plannedQty: editQty,
+      plannedQty: parseFloat(editQty) || 1,
       unit: editUnit,
-      estimatedPrice: editEstimatedPrice,
+      estimatedPrice: parseFloat(editEstimatedPrice) || 0,
       section: editSection || "",
     });
     await updateDoc(doc(db, "lists", listId), { lastUpdated: serverTimestamp() });
@@ -454,9 +456,9 @@ export default function ListDetail() {
                     <input
                       type="number"
                       value={editQty}
-                      onChange={(e) => setEditQty(parseFloat(e.target.value) || 1)}
-                      min={0.1}
-                      step={0.1}
+                      onChange={(e) => setEditQty(e.target.value)}
+                      min={0}
+                      step="any"
                       className="input-field w-20 text-sm py-1.5"
                     />
                     <select
@@ -470,9 +472,9 @@ export default function ListDetail() {
                     <input
                       type="number"
                       value={editEstimatedPrice}
-                      onChange={(e) => setEditEstimatedPrice(parseFloat(e.target.value) || 0)}
+                      onChange={(e) => setEditEstimatedPrice(e.target.value)}
                       min={0}
-                      step={0.01}
+                      step="any"
                       className="input-field w-24 text-sm py-1.5"
                     />
                     <button onClick={handleSaveEdit} className="p-1.5 text-green-600 hover:bg-green-50 dark:hover:bg-green-950 rounded-lg">
@@ -610,9 +612,9 @@ export default function ListDetail() {
               <input
                 type="number"
                 value={newQty}
-                onChange={(e) => setNewQty(parseFloat(e.target.value) || 1)}
-                min={0.1}
-                step={0.1}
+                onChange={(e) => setNewQty(e.target.value)}
+                min={0}
+                step="any"
                 className="input-field w-20 text-sm"
                 placeholder="Qtd"
               />
@@ -648,8 +650,8 @@ export default function ListDetail() {
                   onChange={(e) => setNewCustomPrice(e.target.value)}
                   className="input-field w-28 text-sm"
                   placeholder="R$ 0.00"
-                  step="0.01"
-                  min="0"
+                  step="any"
+                  min={0}
                 />
               )}
             </div>
@@ -722,8 +724,8 @@ export default function ListDetail() {
                   value={checkoutActualQty}
                   onChange={(e) => setCheckoutActualQty(e.target.value)}
                   className="input-field"
-                  step="0.01"
-                  min="0.01"
+                  step="any"
+                  min={0}
                   placeholder={checkoutItem.plannedQty.toString()}
                 />
               </div>
@@ -737,8 +739,8 @@ export default function ListDetail() {
                     onChange={(e) => setCheckoutUnitPrice(e.target.value)}
                     className="input-field"
                     placeholder="0.00"
-                    step="0.01"
-                    min="0"
+                    step="any"
+                    min={0}
                   />
                   {checkoutUnitPrice && checkoutActualQty && (
                     <p className="text-xs text-green-600 mt-1">
@@ -755,8 +757,8 @@ export default function ListDetail() {
                     onChange={(e) => setCheckoutTotalValue(e.target.value)}
                     className="input-field"
                     placeholder="0.00"
-                    step="0.01"
-                    min="0"
+                    step="any"
+                    min={0}
                   />
                   {checkoutTotalValue && checkoutActualQty && (
                     <p className="text-xs text-green-600 mt-1">
