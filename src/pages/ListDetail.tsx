@@ -123,6 +123,10 @@ export default function ListDetail() {
     );
     const unsubItems = onSnapshot(itemsQuery, (snap) => {
       const it = snap.docs.map((d) => ({ id: d.id, ...d.data() } as Item));
+      it.sort((a, b) => {
+        if (a.checked !== b.checked) return a.checked ? 1 : -1;
+        return a.name.toLowerCase().localeCompare(b.name.toLowerCase());
+      });
       setItems(it);
     });
 
@@ -247,13 +251,12 @@ export default function ListDetail() {
   function openCheckout(item: Item) {
     setCheckoutItem(item);
     setCheckoutMode("unitario");
-    setCheckoutUnitPrice(item.actualPrice?.toString() || "");
+    const precoPreenchido = item.actualPrice || item.estimatedPrice || 0;
+    setCheckoutUnitPrice(precoPreenchido > 0 ? precoPreenchido.toString() : "");
     setCheckoutTotalValue(
-      item.actualPrice && item.actualQty
-        ? (item.actualPrice * item.actualQty).toFixed(2)
-        : ""
+      precoPreenchido > 0 ? (precoPreenchido * item.plannedQty).toFixed(2) : ""
     );
-    setCheckoutActualQty(item.actualQty?.toString() || "");
+    setCheckoutActualQty(item.plannedQty?.toString() || "");
   }
 
   function getCheckoutResult() {
